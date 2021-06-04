@@ -28,7 +28,6 @@ const theme = {
 };
 
 const Container = styled.div`
-${props=>console.log(props)}
   background-color: ${({theme}) => theme.backgroundColor};
   height: 100%;
   display: flex;
@@ -129,27 +128,55 @@ const Refresh = styled.div`
   }
 `;
 
+const AUTHORIZATION_KEY = 'CWB-34000862-50AF-423E-A896-52BD8C4CDE38';
+const LOCATION_NAME = '臺北';
 const App = () => {
   // const [ currentTheme, setCurrentTheme] = useState('light');
   // 定義會使用到的資料狀態
   const [ currentWeather, setCurrentWeather] = useState({
     location: '臺北市',
-    Description: '多雲時晴',
+    description: '多雲時晴',
     windSpeed: 1.1,
-    Temperature: 22.9,
+    temperature: 22.9,
     rainPossibility: 47.3,
     observationTime: '2020-12-12 22:10:00',
   });
 
+  const handleClick = () => {
+    fetch(`https://opendata.cwb.gov.tw/api/v1/rest/datastore/O-A0003-001?Authorization=${AUTHORIZATION_KEY}&locationName=${LOCATION_NAME}`)
+    .then((Response) => Response.json())  //取得伺服器回傳的資料並以JSON解析
+    .then((data) => {
+      // 解析後的JSON資料
+      const locationData = data.records.location[0];
+      const weatherElements = locationData.weatherElement.reduce(
+        (neededElements, item) => {
+          if (['WDSD','TEMP'].includes(item.elementName)){
+            neededElements[item.elementName] = item.elementValue;
+          }
+          return neededElements;
+        }, {}
+      );
+      // 更新React 資料狀態
+      setCurrentWeather({
+        observationTime: locationData.time.obsTime,
+        locationName: locationData.locationName,
+        temperature: weatherElements.TEMP,
+        windSpeed: weatherElements.WDSD,
+        description: '多雲時晴',
+        rainPossibility: 60,
+      });
+
+    });
+  };
   return (
   <ThemeProvider theme={theme.dark}>
     <Container theme={theme.dark}>
       <WeatherCard>
         <Location >{currentWeather.location}</Location>
-        <Description>{currentWeather.Description}</Description>
+        <Description>{currentWeather.description}</Description>
         <CurrentWeather>
           <Temperature>
-            {currentWeather.Temperature} <Celsius>°C</Celsius>
+            {Math.round(currentWeather.temperature)} <Celsius>°C</Celsius>
           </Temperature>
           <DayCloudy />
         </CurrentWeather>
@@ -159,13 +186,13 @@ const App = () => {
         <Rain>
           <RainIcon /> {Math.round(currentWeather.rainPossibility)}%
         </Rain>
-        <Refresh>
+        <Refresh onClick={handleClick}>
           最後觀測時間：{new Intl.DateTimeFormat('zh-TW',{
             hour: 'numeric',
             minute: 'numeric',
           }).format(dayjs(currentWeather.observationTime))} <RefreshIcon />
           {/* 這裡的dayjs 用來代替 new Date 方法 */}
-        </Refresh>
+        </Refresh >
       </WeatherCard>
     </Container>
   </ThemeProvider>
