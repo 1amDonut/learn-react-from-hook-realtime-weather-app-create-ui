@@ -1,11 +1,13 @@
 import { ThemeProvider } from '@emotion/react';
 import { ReactComponent as AirFlowIcon } from './images/airFlow.svg';
 import { ReactComponent as DayCloudyIcon } from './images/day-cloudy.svg';
+import { ReactComponent as LoadingIcon } from './images/loading.svg';
 import { ReactComponent as RainIcon } from './images/rain.svg';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ReactComponent as RefreshIcon } from './images/refresh.svg';
 import styled from '@emotion/styled';
 import dayjs from 'dayjs';
+import { findRenderedComponentWithType } from 'react-dom/test-utils';
 
 const theme = {
   light: {
@@ -125,12 +127,26 @@ const Refresh = styled.div`
     width: 15px;
     height: 15px;
     cursor: pointer;
+    /* STEP 2：使用 rotate 動畫效果在 svg 圖示上 */
+    animation: rotate infinite 1.5s linear;
+    animation-duration: ${({ isLoading }) => (isLoading ? '1.5s' : '0s')};
+  }
+
+  /* STEP 1：定義旋轉的動畫效果，並取名為 rotate */
+  @keyframes rotate {
+    from {
+      transform: rotate(360deg);
+    }
+    to {
+      transform: rotate(0deg);
+    }
   }
 `;
 
 const AUTHORIZATION_KEY = 'CWB-34000862-50AF-423E-A896-52BD8C4CDE38';
 const LOCATION_NAME = '臺北';
 const App = () => {
+  console.log('invoke function component');
   // const [ currentTheme, setCurrentTheme] = useState('light');
   // 定義會使用到的資料狀態
   const [ currentWeather, setCurrentWeather] = useState({
@@ -140,9 +156,21 @@ const App = () => {
     temperature: 22.9,
     rainPossibility: 47.3,
     observationTime: '2020-12-12 22:10:00',
+    isLoading: true,
   });
 
-  const handleClick = () => {
+  // 加入useEffect方法，參數是需要方入函式
+  useEffect(()=>{
+    console.log('execute function in useEffect');
+    fetchCurrentWeather();
+  },[]);
+
+  const fetchCurrentWeather = () => {
+    setCurrentWeather((prevState) => ({
+      ...prevState,
+      isLoading: true,
+    }));
+
     fetch(`https://opendata.cwb.gov.tw/api/v1/rest/datastore/O-A0003-001?Authorization=${AUTHORIZATION_KEY}&locationName=${LOCATION_NAME}`)
     .then((Response) => Response.json())  //取得伺服器回傳的資料並以JSON解析
     .then((data) => {
@@ -164,6 +192,7 @@ const App = () => {
         windSpeed: weatherElements.WDSD,
         description: '多雲時晴',
         rainPossibility: 60,
+        isLoading: false,
       });
 
     });
@@ -171,6 +200,7 @@ const App = () => {
   return (
   <ThemeProvider theme={theme.dark}>
     <Container theme={theme.dark}>
+      {console.log('render')}
       <WeatherCard>
         <Location >{currentWeather.location}</Location>
         <Description>{currentWeather.description}</Description>
@@ -186,12 +216,13 @@ const App = () => {
         <Rain>
           <RainIcon /> {Math.round(currentWeather.rainPossibility)}%
         </Rain>
-        <Refresh onClick={handleClick}>
+        <Refresh onClick={fetchCurrentWeather} isLoading={currentWeather.isLoading}>
           最後觀測時間：{new Intl.DateTimeFormat('zh-TW',{
             hour: 'numeric',
             minute: 'numeric',
-          }).format(dayjs(currentWeather.observationTime))} <RefreshIcon />
+          }).format(dayjs(currentWeather.observationTime))}{' '} 
           {/* 這裡的dayjs 用來代替 new Date 方法 */}
+          {currentWeather.isLoading ? <LoadingIcon/> : <RefreshIcon/>}
         </Refresh >
       </WeatherCard>
     </Container>
