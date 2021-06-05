@@ -7,7 +7,7 @@ import React, { useEffect, useState } from 'react';
 import { ReactComponent as RefreshIcon } from './images/refresh.svg';
 import styled from '@emotion/styled';
 import dayjs from 'dayjs';
-import { findRenderedComponentWithType } from 'react-dom/test-utils';
+// import { findRenderedComponentWithType } from 'react-dom/test-utils';
 
 const theme = {
   light: {
@@ -145,28 +145,32 @@ const Refresh = styled.div`
 
 const AUTHORIZATION_KEY = 'CWB-34000862-50AF-423E-A896-52BD8C4CDE38';
 const LOCATION_NAME = '臺北';
+const LOCATION_NAME_FORECAST = '臺北市';
+
 const App = () => {
-  console.log('invoke function component');
   // const [ currentTheme, setCurrentTheme] = useState('light');
   // 定義會使用到的資料狀態
-  const [ currentWeather, setCurrentWeather] = useState({
-    location: '臺北市',
-    description: '多雲時晴',
-    windSpeed: 1.1,
-    temperature: 22.9,
-    rainPossibility: 47.3,
-    observationTime: '2020-12-12 22:10:00',
+  const [ weatherElement, setWeatherElement] = useState({
+    location: '',
+    locationName: '',
+    description: '',
+    windSpeed: 0,
+    temperature:0,
+    weatherCode: 0,
+    rainPossibility: 0,
+    comfortability: '',
+    observationTime: new Date(),
     isLoading: true,
   });
 
   // 加入useEffect方法，參數是需要方入函式
   useEffect(()=>{
-    console.log('execute function in useEffect');
     fetchCurrentWeather();
+    fetchWeatherForecast();
   },[]);
 
   const fetchCurrentWeather = () => {
-    setCurrentWeather((prevState) => ({
+    setWeatherElement((prevState) => ({
       ...prevState,
       isLoading: true,
     }));
@@ -185,44 +189,84 @@ const App = () => {
         }, {}
       );
       // 更新React 資料狀態
-      setCurrentWeather({
+      setWeatherElement((prevState) => ({
+        ...prevState,
         observationTime: locationData.time.obsTime,
         locationName: locationData.locationName,
         temperature: weatherElements.TEMP,
         windSpeed: weatherElements.WDSD,
-        description: '多雲時晴',
-        rainPossibility: 60,
         isLoading: false,
-      });
+      }));
 
     });
   };
+
+  const fetchWeatherForecast = () =>{
+    fetch(`https://opendata.cwb.gov.tw/api/v1/rest/datastore/F-C0032-001?Authorization=${AUTHORIZATION_KEY}&locationName=${LOCATION_NAME_FORECAST}`
+    )
+    .then((response) => response.json())
+    .then((data) => {
+      const locationData = data.records.location[0];
+
+      const weatherElements = locationData.weatherElement.reduce(
+        (neededElements, item) => {
+          // 只保留需要用到的 天氣現象、降雨機率、舒適度
+          if (['Wx', 'PoP', 'CI'].includes(item.elementName)){
+            neededElements[item.elementName] = item.time[0].parameter;
+          }
+          return neededElements;
+        },
+        {}
+      );
+      setWeatherElement((prevState) => ({
+        ...prevState,
+        description: weatherElements.Wx.parameterName,
+        weatherCode: weatherElements.Wx.parameterValue,
+        rainPossibility: weatherElements.PoP.parameterName,
+        comfortability: weatherElements.CI.parameterName,
+      }));
+    });
+  };
+
+  const {
+    observationTime,
+    locationName,
+    description,
+    windSpeed,
+    temperature,
+    rainPossibility,
+    isLoading,
+    comfortability,
+  } = weatherElement;
   return (
   <ThemeProvider theme={theme.dark}>
     <Container theme={theme.dark}>
-      {console.log('render')}
       <WeatherCard>
-        <Location >{currentWeather.location}</Location>
-        <Description>{currentWeather.description}</Description>
+        <Location >{locationName}</Location>
+        <Description>{description}{comfortability}</Description>
         <CurrentWeather>
           <Temperature>
-            {Math.round(currentWeather.temperature)} <Celsius>°C</Celsius>
+            {Math.round(temperature)} <Celsius>°C</Celsius>
           </Temperature>
           <DayCloudy />
         </CurrentWeather>
         <AirFlow>
-          <AirFlowIcon /> 23 m/h
+          <AirFlowIcon /> {windSpeed} m/h
         </AirFlow>
         <Rain>
-          <RainIcon /> {Math.round(currentWeather.rainPossibility)}%
+          <RainIcon /> {Math.round(rainPossibility)}%
         </Rain>
-        <Refresh onClick={fetchCurrentWeather} isLoading={currentWeather.isLoading}>
+        <Refresh onClick={()=> {
+          fetchCurrentWeather();
+          fetchWeatherForecast();
+        }} 
+        isLoading={isLoading}>
           最後觀測時間：{new Intl.DateTimeFormat('zh-TW',{
             hour: 'numeric',
             minute: 'numeric',
-          }).format(dayjs(currentWeather.observationTime))}{' '} 
+          }).format(dayjs(observationTime))}{' '} 
           {/* 這裡的dayjs 用來代替 new Date 方法 */}
-          {currentWeather.isLoading ? <LoadingIcon/> : <RefreshIcon/>}
+          {isLoading ? <LoadingIcon/> : <RefreshIcon/>}
         </Refresh >
       </WeatherCard>
     </Container>
